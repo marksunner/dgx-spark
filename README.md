@@ -8,9 +8,9 @@ This is a fast-moving space. We've explored some of the pieces to this puzzle, c
 
 ### Atlas *(active — contributing upstream)*
 
-[Atlas](https://github.com/crate-ai/atlas) is a pure Rust inference engine built with an AI-first philosophy. We're actively contributing Step 3.7 Flash NVFP4 support — Blackwell kernel targets, model architecture, weight loading, and expert parallelism for DGX Spark's sm_121a.
+[Atlas](https://github.com/Avarok-Cybersecurity/atlas) is a pure Rust inference engine built with an AI-first philosophy. We're actively contributing Step 3.7 Flash NVFP4 support — Blackwell kernel targets, model architecture, weight loading, and expert parallelism for DGX Spark's sm_121a.
 
-- **[PR #119](https://github.com/crate-ai/atlas/pull/119)** — Step 3.7 Flash NVFP4 support (work in progress)
+- **[PR #119](https://github.com/Avarok-Cybersecurity/atlas/pull/119)** — Step 3.7 Flash NVFP4 support (work in progress)
 - **[Our Atlas fork](https://github.com/marksunner/atlas)** — Development branch
 
 This is where most of our current energy is focused. Atlas's Rust + CUDA approach is compelling for DGX Spark — native Blackwell support, no Python overhead, and a design philosophy that aligns with how we think about inference.
