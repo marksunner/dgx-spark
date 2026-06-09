@@ -44,7 +44,7 @@ This is probably the most common question for anyone arriving with a DGX Spark a
 | **Guide** | [Single Spark](https://github.com/marksunner/dgx-spark-step37-flash) | [Dual Spark](https://github.com/marksunner/dgx-spark-step37-dual) |
 | **Engine** | llama.cpp (Q4_K_S GGUF) | vLLM (NVFP4, StepFun fork) |
 | **Throughput** | ~27 tok/s | ~18.5 tok/s (with RoCE) |
-| **Context** | 128K | **262K** |
+| **Context** | 96K (see [stability notes](https://github.com/marksunner/dgx-spark-step37-flash#stability-cuda-graph-crash--context-ceiling)) | **262K** |
 | **Quantization** | Q4_K_S (more aggressive) | NVFP4 (closer to BF16) |
 | **Vision** | Via mmproj | Native (1.8B encoder) |
 | **Complexity** | Low | High |
@@ -52,6 +52,61 @@ This is probably the most common question for anyone arriving with a DGX Spark a
 The single-Spark option is faster and simpler. The dual-Spark option unlocks the model's full 262K native context — useful for large codebases, long documents, or extended conversations. Throughput is roughly equivalent; context window is the practical differentiator.
 
 The NVFP4 model weights (~121 GB) simply don't fit on a single Spark with room for KV cache. That's the physics of it.
+
+## Model Bake-Off: Research Task Quality
+
+*Added June 9, 2026*
+
+We gave two models on separate DGX Sparks the same real-world research task: "Write a comprehensive landscape report on the state of local LLM inference on DGX Spark in June 2026." The task required searching multiple sources, cross-referencing conflicting claims, and producing a structured report with citations. Both models ran through [Hermes](https://github.com/NousResearch/hermes-agent) with identical tooling (web search, file I/O).
+
+### The Contenders
+
+| | Step 3.7 Flash | Qwen 3.5 122B |
+|---|---|---|
+| **Architecture** | 198B MoE (~11B active) | 122B MoE (~10B active) |
+| **Quantization** | Q4_K_S GGUF | INT4+FP8 hybrid (AutoRound) |
+| **Engine** | llama.cpp | vLLM |
+| **Hardware** | 1× DGX Spark | 1× DGX Spark |
+| **Generation speed** | ~28 tok/s | ~47 tok/s |
+
+### Results
+
+| Metric | Step 3.7 Flash | Qwen 3.5 122B |
+|--------|---------------|---------------|
+| **Time to complete** | ~27 minutes | ~4 minutes |
+| **Report size** | 366 lines / 37 KB | 505 lines / 20 KB |
+| **Web searches performed** | 24 | ~13 |
+| **Sources cited** | 74 (numbered) | ~25 (inline) |
+| **Contradictions identified** | 6 (with analysis) | 4 (with analysis) |
+| **All 6 sections covered** | ✅ | ✅ |
+
+### What We Observed
+
+**Step 3.7 Flash went deeper.** More searches, more sources, and more detailed analysis of contradictions. When two sources gave conflicting performance numbers, Step 3.7 didn't just note the discrepancy — it identified the root cause (e.g., confusing prefill throughput with generation speed, or model-dependent quantization quality). The built-in reasoning (chain-of-thought) appears to genuinely improve analytical quality on tasks that require comparing and reconciling information.
+
+**Qwen 3.5 122B was dramatically faster.** ~6.7× faster wall-clock time for a report that covered the same ground. The output was more concisely formatted, more actionable in its recommendations, and included practical findings the other model missed (e.g., AWQ/GPTQ performing poorly at 1.8–4.9 tok/s on GB10, and Atlas inference engine benchmarks).
+
+**Both had potential hallucination risk.** Neither model's source URLs were fully verified. With 74 cited sources, Step 3.7 has more surface area for fabricated links — but also more genuine ones. Qwen 3.5 cited fewer sources overall but included some that appeared to be plausible-looking URLs for pages that may not exist. This is a known limitation of LLM-driven web research and applies equally to both models.
+
+**Context leakage.** Qwen 3.5 122B leaked a fragment of its agent system prompt into the output (a recommendation to "follow Castle stability policy" — an internal convention, not relevant to a public report). Step 3.7 Flash did not exhibit this. Worth noting for anyone using these models in agent pipelines where system instructions should stay private.
+
+### The Trade-off
+
+This isn't a "which model is better" result. It's a speed-vs-depth trade-off that maps to different use cases:
+
+- **Need a quick answer or operational task?** Qwen 3.5 122B. 80% of the quality in 15% of the time.
+- **Need thorough research where accuracy matters?** Step 3.7 Flash. Slower, but the reasoning engine catches nuances that faster models glide over.
+- **Running both on separate Sparks?** Use Qwen for fast triage and Step 3.7 for deep dives. They complement each other.
+
+Both models ran as autonomous agents on single DGX Sparks with no human intervention during the task. The fact that either can produce a 300+ line sourced research report from a single prompt — on local hardware, at zero API cost — is the real headline.
+
+### Methodology Notes
+
+- Same prompt, same Hermes agent framework, same tool configuration
+- Step 3.7 Flash: Q4_K_S GGUF via llama.cpp, 96K context, q8_0 KV cache ([details](https://github.com/marksunner/dgx-spark-step37-flash))
+- Qwen 3.5 122B: INT4+FP8 hybrid via vLLM, 131K context ([details](https://github.com/marksunner/dgx-spark-single-stack))
+- Neither model was given any prior context about the topic — cold start, research from scratch
+- Web search results depend on timing and search provider, so some variation in available sources is expected
 
 ## Things We've Learned Along the Way
 
