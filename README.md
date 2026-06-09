@@ -88,7 +88,7 @@ We gave two models on separate DGX Sparks the same real-world research task: "Wr
 
 **Both had potential hallucination risk.** Neither model's source URLs were fully verified. With 74 cited sources, Step 3.7 has more surface area for fabricated links — but also more genuine ones. Qwen 3.5 cited fewer sources overall but included some that appeared to be plausible-looking URLs for pages that may not exist. This is a known limitation of LLM-driven web research and applies equally to both models.
 
-**Context leakage.** Qwen 3.5 122B leaked a fragment of its agent system prompt into the output (a recommendation to "follow Castle stability policy" — an internal convention, not relevant to a public report). Step 3.7 Flash did not exhibit this. Worth noting for anyone using these models in agent pipelines where system instructions should stay private.
+**Context leakage.** Qwen 3.5 122B leaked a fragment of its agent system prompt into the output (an internal operational convention presented as a public recommendation). Step 3.7 Flash did not exhibit this. Worth noting for anyone using these models in agent pipelines where system instructions should stay private.
 
 ### The Trade-off
 
