@@ -13,7 +13,7 @@ This is a fast-moving space. We've explored some of the pieces to this puzzle, c
 - **[PR #136](https://github.com/Avarok-Cybersecurity/atlas/pull/136)** — Step 3.7 Flash NVFP4 support (work in progress)
 - **[Our Atlas fork](https://github.com/marksunner/atlas)** — Development branch
 
-This is where most of our current energy is focused. Atlas's Rust + CUDA approach is compelling for DGX Spark — native Blackwell support, no Python overhead, and a design philosophy that aligns with how we think about inference.
+This is where much of our current energy is focused. Atlas's Rust + CUDA approach is compelling for DGX Spark — native Blackwell support, no Python overhead, and a design philosophy that aligns with how we think about inference.
 
 ### vLLM
 
