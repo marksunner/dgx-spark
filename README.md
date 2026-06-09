@@ -170,7 +170,7 @@ This pattern works because the two models have genuinely different failure modes
 All testing on NVIDIA DGX Sparks:
 - **SoC:** GB10 Grace Blackwell (sm_121a)
 - **Memory:** 128 GB unified (CPU+GPU shared)
-- **Interconnect:** 200 Gbps QSFP-DD (ConnectX-7, RoCE capable)
+- **Interconnect:** 200 Gbps QSFP-DD (ConnectX-7, RoCE capable) — used only for [dual-Spark tensor parallelism](https://github.com/marksunner/dgx-spark-step37-dual). The model bake-off and pipeline tests above used two independent Sparks on a standard LAN — no QSFP cable or special networking required.
 
 ## Acknowledgements
 
