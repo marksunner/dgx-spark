@@ -13,7 +13,9 @@ This is a fast-moving space. We've explored some of the pieces to this puzzle, c
 - **[PR #136](https://github.com/Avarok-Cybersecurity/atlas/pull/136)** — Step 3.7 Flash NVFP4 support (work in progress)
 - **[Our Atlas fork](https://github.com/marksunner/atlas)** — Development branch
 
-This is where much of our current energy is focused. Atlas's Rust + CUDA approach is compelling for DGX Spark — native Blackwell support, no Python overhead, and a design philosophy that aligns with how we think about inference.
+Atlas's Rust + CUDA approach is compelling for DGX Spark — native Blackwell support, no Python overhead, and a design philosophy that aligns with how we think about inference.  This is where much of our current energy is focused and there is more to do. 
+
+Update June 10, 2026: Currently trying to balance compute constraints needed to press forward (lack of API headroom is slowing current progress) but, once complete, it's our belief that Atlas has the potential to be an (if not THE) optimal Inference Engine for Step 3.7.
 
 ### vLLM
 
