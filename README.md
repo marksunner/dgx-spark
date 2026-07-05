@@ -1,28 +1,32 @@
 # DGX Spark — Notes from the Workshop
 
-Working notes from running large language models on NVIDIA DGX Sparks. Everything here was tested on real hardware and documented honestly — including what didn't work.
+Working notes from running large language models on NVIDIA DGX Sparks. Everything here was tested on real hardware and documented honestly — including what didn't work, and what the community has since done better.
 
 This is a fast-moving space. We've explored some of the pieces to this puzzle, certainly not all of them. What follows is what we've found so far.
 
 ## Inference Engines
 
-### Atlas *(active — contributing upstream)*
+### Atlas *(contributions merged upstream)*
 
-[Atlas](https://github.com/Avarok-Cybersecurity/atlas) is a pure Rust inference engine built with an AI-first philosophy. We're actively contributing Step 3.7 Flash NVFP4 support — Blackwell kernel targets, model architecture, weight loading, and expert parallelism for DGX Spark's sm_121a.
+[Atlas](https://github.com/Avarok-Cybersecurity/atlas) is a pure Rust inference engine built with an AI-first philosophy. We contributed Step 3.7 Flash NVFP4 support — Blackwell kernel targets, model architecture, weight loading, and expert parallelism for DGX Spark's sm_121a — and then spent several weeks debugging generation quality on dual Sparks (EP=2), which turned into ~15 additional fixes and one big finding.
 
-- **[PR #136](https://github.com/Avarok-Cybersecurity/atlas/pull/136)** — Step 3.7 Flash NVFP4 support (work in progress)
-- **[Our Atlas fork](https://github.com/marksunner/atlas)** — Development branch
+- **[PR #136](https://github.com/Avarok-Cybersecurity/atlas/pull/136)** — Step 3.7 Flash NVFP4 support (**merged**)
+- **[Issue #184](https://github.com/Avarok-Cybersecurity/atlas/issues/184)** — extended findings: the full quality investigation, quantization A/B, fix list, and open trails
+- **[`step37-flash-fixes` branch](https://github.com/marksunner/atlas/tree/step37-flash-fixes)** — all post-#136 fixes as a single squashed commit on current main, diff-able and cherry-pickable
+- **[Atlas Step 3.7 artifacts repo](https://github.com/marksunner/dgx-spark-step37-flash-atlas)** — test harnesses, raw A/B transcripts, fix→file map, and the validated dual-Spark launch recipe
 
-Atlas's Rust + CUDA approach is compelling for DGX Spark — native Blackwell support, no Python overhead, and a design philosophy that aligns with how we think about inference.  This is where much of our current energy is focused and there is more to do. 
+The headline from the extended work: after fixing everything else (missing BOS token, unparsed `rope_scaling`, dropped `swiglu_limits` clamping, sliding-window decode masking, tool-call handling, and more — full list in Issue #184), the remaining ~30–40% repetition rate in long generations tracked the **NVFP4 4-bit expert path**. Serving the official **FP8 checkpoint** through a new fused-expert loader eliminated it: 0 catastrophic draws in 22 FP8 runs vs 2/5 on NVFP4, same engine, same settings. FP8 fits on 2× Sparks at EP=2 (~103 GB/rank) and decodes at ~20 tok/s with a reliably clean envelope out to ~70K context. The honest caveat: the A/B doesn't separate checkpoint quantization damage from a possible issue in Atlas's own NVFP4 expert kernels — that disambiguation is one of the open trails.
 
-Update June 10, 2026: Currently trying to balance compute constraints needed to press forward (lack of API headroom is slowing current progress) but, once complete, it's our belief that Atlas has the potential to be an (if not THE) optimal Inference Engine for Step 3.7.
+Atlas's Rust + CUDA approach is compelling for DGX Spark — native Blackwell support, no Python overhead, and a design philosophy that aligns with how we think about inference. We're stepping back from active development on this front, but everything we learned is public in the links above and cherry-pickable without contacting us.
 
 ### vLLM
 
 Upstream vLLM does not support multi-node tensor parallelism on DGX Spark out of the box — its V1 engine hardcodes a loopback address for the NCCL rendezvous endpoint. StepFun's vLLM fork adds Step 3.7 model support, and with two source patches for multi-node NCCL plus a Ray executor, dual-Spark TP=2 works. The setup is documented in detail, including what fails and why.
 
 - **[Step 3.7 Flash — Dual Spark](https://github.com/marksunner/dgx-spark-step37-dual)** — NVFP4 across two Sparks via patched StepFun vLLM + Ray TP=2. RoCE RDMA config, 262K context, 18.5 tok/s. Docker device permissions, NCCL environment variables, patches, and everything that didn't work.
-- **[DeepSeek V4 Flash — TP Benchmark](https://github.com/marksunner/dgx-spark-vllm-tp-benchmark)** — 284B MoE dual-Spark benchmark, 12.4 tok/s.
+- **[DeepSeek V4 Flash — TP Benchmark](https://github.com/marksunner/dgx-spark-vllm-tp-benchmark)** — 284B MoE dual-Spark benchmark, 12.4 tok/s. **⚠️ Superseded — see below.**
+
+**Our DeepSeek V4 Flash benchmark is outdated.** It was an honest snapshot of early-2026 tooling (12.4 tok/s, 4K context tested), but the community has moved far past it. The current standard for DeepSeek V4 Flash on dual Sparks is **[tonyd2wild/deepseek-v4-flash-2x-spark-1m](https://github.com/tonyd2wild/deepseek-v4-flash-2x-spark-1m)**: **45.5 tok/s decode at a true 1M-token context** with MTP speculative decoding, ~800–900 tok/s prefill on real 400K–800K prompts, clean tool calling, running a 24/7 production agent fleet from a pre-built Docker image. If you're here for DeepSeek V4 on two Sparks, start there — our repo remains up for historical reference only.
 
 ### llama.cpp / Ollama
 
@@ -35,7 +39,9 @@ The simplest path to running large models on a single Spark. GGUF quantization, 
 
 antirez's inference engine, designed for distributed serving.
 
-- **[DeepSeek V4 Flash — ds4 Benchmark](https://github.com/marksunner/dgx-spark-ds4-benchmark)** — 284B MoE dual-Spark benchmark, 11.4 tok/s.
+**⚠️ Superseded** — see [tonyd2wild/deepseek-v4-flash-2x-spark-1m](https://github.com/tonyd2wild/deepseek-v4-flash-2x-spark-1m) for the current community standard (45 tok/s, 1M context).
+
+- **[DeepSeek V4 Flash — ds4 Benchmark](https://github.com/marksunner/dgx-spark-ds4-benchmark)** — 284B MoE dual-Spark benchmark, 11.4 tok/s. ⚠️ *Superseded — see the [1M-context recipe](https://github.com/tonyd2wild/deepseek-v4-flash-2x-spark-1m) above for current performance (45 tok/s with MTP).*
 
 ## Step 3.7 Flash — One Spark or Two?
 
@@ -54,6 +60,8 @@ This is probably the most common question for anyone arriving with a DGX Spark a
 The single-Spark option is faster and simpler. The dual-Spark option unlocks the model's full 262K native context — useful for large codebases, long documents, or extended conversations. Throughput is roughly equivalent; context window is the practical differentiator.
 
 The NVFP4 model weights (~121 GB) simply don't fit on a single Spark with room for KV cache. That's the physics of it.
+
+> **New third option — Atlas with the FP8 checkpoint (dual Spark).** Following the [Issue #184](https://github.com/Avarok-Cybersecurity/atlas/issues/184) investigation, Atlas now serves the official FP8 checkpoint at EP=2 across two Sparks: ~20 tok/s decode, zero repetition failures in our 22-run battery, with a validated working envelope of ~70K context (needle retrieval passes at 70–78K, fails at 85K+ — well short of the checkpoint's declared 256K, but clean where it works). Launch recipe and harnesses in the [artifacts repo](https://github.com/marksunner/dgx-spark-step37-flash-atlas). Pick it if you want Rust-native serving with the best generation quality we've measured on dual Sparks; pick vLLM if you need the full context window.
 
 ## Model Bake-Off: Research Task Quality
 
@@ -167,6 +175,8 @@ This pattern works because the two models have genuinely different failure modes
 
 - **Docker `-v` is not `--device`.** Volume-mounting `/dev/infiniband` makes RDMA device files visible inside the container but Docker's device cgroup blocks actual access. You need `--device=/dev/infiniband/uverbsX` for each device. This cost us a morning so it doesn't have to cost you one.
 
+- **4-bit quantization quality is tensor-dependent, not just engine-dependent.** The same Step 3.7 model that runs cleanly as Q4_K_S on llama.cpp looped badly as NVFP4 on Atlas until the experts were served in FP8 — after every engine bug had been fixed. If a quantized model misbehaves, suspect *which tensors* are quantized before blaming the engine or the model. Details in [Atlas Issue #184](https://github.com/Avarok-Cybersecurity/atlas/issues/184).
+
 ## Hardware
 
 All testing on NVIDIA DGX Sparks:
@@ -178,6 +188,7 @@ All testing on NVIDIA DGX Sparks:
 
 - **Nic (albond)** — hybrid INT4+FP8 recipe and OOM guardrails
 - **AEON-7** — [vLLM Ultimate DGX Spark container](https://github.com/AEON-7/vllm-ultimate-dgx-spark) and sm_121a reference
+- **tonyd2wild** — the [1M-context DeepSeek V4 dual-Spark recipe](https://github.com/tonyd2wild/deepseek-v4-flash-2x-spark-1m) that superseded our benchmark
 - **StepFun** — Step 3.7 Flash model and vLLM fork
 - **antirez** — ds4 inference engine
 - **AzeezIsh and Thomas Braun** — Atlas creators, responsive and encouraging
