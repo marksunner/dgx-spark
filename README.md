@@ -8,11 +8,11 @@ This is a fast-moving space. We've explored some of the pieces to this puzzle, c
 
 ### GLM 5.2 on 4× Sparks ✨ *NEW*
 
-**[GLM 5.2 Quad-Spark Deployment Guide](https://github.com/marksunner/dgx-spark-guides)** — Z.ai's 671B-parameter reasoning model running across four DGX Sparks with all 256 experts active, 200K context, and MTP speculative decoding (~26 tok/s).
+**[GLM 5.2 Quad-Spark Deployment Guide](https://github.com/marksunner/dgx-spark-glm52)** — Z.ai's 671B-parameter reasoning model running across four DGX Sparks with all 256 experts active, 200K context, and MTP speculative decoding (~26 tok/s).
 
 The complete honest journey: unboxing virgin hardware, provisioning four nodes, building the QSFP fabric, the custom vLLM container, and the four bugs we found and fixed along the way (KV cache shape mismatch, Docker build-cache serving wrong commits, `__pycache__` bytecode staleness, DeepGEMM warmup failures).
 
-Companion guide: **[What Is Fabric?](https://github.com/marksunner/dgx-spark-guides/blob/main/what-is-fabric.md)** — a standalone walkthrough for turning a MikroTik CRS812 from a stock Ethernet switch into a lossless RoCE fabric. Friendly to first-timers ("first the earth cooled…") and reusable for any cluster project.
+Companion guide: **[What Is Fabric?](https://github.com/marksunner/dgx-spark-glm52/blob/main/what-is-fabric.md)** — a standalone walkthrough for turning a MikroTik CRS812 from a stock Ethernet switch into a lossless RoCE fabric. Friendly to first-timers ("first the earth cooled…") and reusable for any cluster project.
 
 Built on tonyd2wild's [QuantTrio recipe](https://github.com/tonyd2wild/GLM-5.2-QuantTrio-200K-4x-DGX-Spark) — full attribution throughout.
 
