@@ -6,6 +6,16 @@ This is a fast-moving space. We've explored some of the pieces to this puzzle, c
 
 ## Inference Engines
 
+### GLM 5.2 on 4× Sparks ✨ *NEW*
+
+**[GLM 5.2 Quad-Spark Deployment Guide](https://github.com/marksunner/dgx-spark-guides)** — Z.ai's 671B-parameter reasoning model running across four DGX Sparks with all 256 experts active, 200K context, and MTP speculative decoding (~26 tok/s).
+
+The complete honest journey: unboxing virgin hardware, provisioning four nodes, building the QSFP fabric, the custom vLLM container, and the four bugs we found and fixed along the way (KV cache shape mismatch, Docker build-cache serving wrong commits, `__pycache__` bytecode staleness, DeepGEMM warmup failures).
+
+Companion guide: **[What Is Fabric?](https://github.com/marksunner/dgx-spark-guides/blob/main/what-is-fabric.md)** — a standalone walkthrough for turning a MikroTik CRS812 from a stock Ethernet switch into a lossless RoCE fabric. Friendly to first-timers ("first the earth cooled…") and reusable for any cluster project.
+
+Built on tonyd2wild's [QuantTrio recipe](https://github.com/tonyd2wild/GLM-5.2-QuantTrio-200K-4x-DGX-Spark) — full attribution throughout.
+
 ### Atlas *(contributions merged upstream)*
 
 [Atlas](https://github.com/Avarok-Cybersecurity/atlas) is a pure Rust inference engine built with an AI-first philosophy. We contributed Step 3.7 Flash NVFP4 support — Blackwell kernel targets, model architecture, weight loading, and expert parallelism for DGX Spark's sm_121a — and then spent several weeks debugging generation quality on dual Sparks (EP=2), which turned into ~15 additional fixes and one big finding.
@@ -171,10 +181,12 @@ This pattern works because the two models have genuinely different failure modes
 
 - **GPU and CPU don't compete on DGX Spark.** Inference engines claim GPU memory; agent frameworks run on CPU/system RAM. They coexist on one box without contention.
 
+- **GLM 5.2 fits on 4× Sparks with room to spare.** The 405 GB QuantTrio Int4-Int8Mix checkpoint splits to ~98 GiB per node at TP=4, leaving ~30 GiB free for KV cache, CUDA graphs, and OS — enough for 200K context. That's with all 256 experts alive and no pruning.
 - **RoCE is worth the effort for multi-node.** RDMA over the QSFP link gave us 46% throughput improvement over TCP for tensor-parallel workloads. The setup requires specific NCCL environment variables and Docker device cgroup permissions — documented in the [dual-Spark guide](https://github.com/marksunner/dgx-spark-step37-dual).
 
 - **Docker `-v` is not `--device`.** Volume-mounting `/dev/infiniband` makes RDMA device files visible inside the container but Docker's device cgroup blocks actual access. You need `--device=/dev/infiniband/uverbsX` for each device. This cost us a morning so it doesn't have to cost you one.
 
+- **Two-site bugs exist and will cost you days.** The KV cache shape mismatch that bit us hardest appeared in TWO different files (indexer.py and flashmla_sparse.py) with different propagation paths for the cache dtype string. The fix was identical in both places — checking `head_size == 576` instead of trusting `cache_dtype_str` — but finding both sites required reading vLLM's batch reshape pipeline. If your shape error looks familiar and "already fixed", check the `__pycache__` folder.
 - **4-bit quantization quality is tensor-dependent, not just engine-dependent.** The same Step 3.7 model that runs cleanly as Q4_K_S on llama.cpp looped badly as NVFP4 on Atlas until the experts were served in FP8 — after every engine bug had been fixed. If a quantized model misbehaves, suspect *which tensors* are quantized before blaming the engine or the model. Details in [Atlas Issue #184](https://github.com/Avarok-Cybersecurity/atlas/issues/184).
 
 ## Hardware
